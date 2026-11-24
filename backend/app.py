@@ -21,48 +21,62 @@ def serve_static(filename):
     return send_from_directory(app.static_folder, filename)
 
 
+# --- Error handlers ---
+# Flask picks the most specific handler, so the two subclasses below are
+# matched before the general ValueError handler.
+
+
 def error_response(message, status_code):
     """Build the standard {"error": message} JSON response."""
     return jsonify({"error": message}), status_code
 
 
+@app.errorhandler(DuplicateOrderError)
+def handle_duplicate_order(error):
+    return error_response(str(error), 409)
+
+
+@app.errorhandler(OrderNotFoundError)
+def handle_order_not_found(error):
+    return error_response(str(error), 404)
+
+
+@app.errorhandler(ValueError)
+def handle_invalid_input(error):
+    return error_response(str(error), 400)
+
+
+# --- Routes ---
+
+
 def read_json_object():
-    """Return the request body if it is a JSON object, otherwise None."""
+    """Return the request body as a dict, or raise ValueError."""
     data = request.get_json(silent=True)
-    return data if isinstance(data, dict) else None
+    if not isinstance(data, dict):
+        raise ValueError("Request body must be a JSON object.")
+    return data
 
 
 @app.route('/api/orders', methods=['POST'])
 def add_order_api():
     """Create an order: 201 on success, 409 if the ID exists, else 400."""
     data = read_json_object()
-    if data is None:
-        return error_response("Request body must be a JSON object.", 400)
-
-    try:
-        order = order_tracker.add_order(
-            data.get("order_id"),
-            data.get("item_name"),
-            data.get("quantity"),
-            data.get("customer_id"),
-            data.get("status", "pending"),
-        )
-    except DuplicateOrderError as error:
-        return error_response(str(error), 409)
-    except ValueError as error:
-        return error_response(str(error), 400)
+    order = order_tracker.add_order(
+        data.get("order_id"),
+        data.get("item_name"),
+        data.get("quantity"),
+        data.get("customer_id"),
+        data.get("status", "pending"),
+    )
     return jsonify(order), 201
 
 
 @app.route('/api/orders/<string:order_id>', methods=['GET'])
 def get_order_api(order_id):
     """Return one order, or 404 if it does not exist."""
-    try:
-        order = order_tracker.get_order_by_id(order_id)
-    except ValueError as error:
-        return error_response(str(error), 400)
+    order = order_tracker.get_order_by_id(order_id)
     if order is None:
-        return error_response("Order not found", 404)
+        raise OrderNotFoundError("Order not found")
     return jsonify(order), 200
 
 
@@ -72,17 +86,9 @@ def get_order_api(order_id):
 def update_order_status_api(order_id):
     """Update an order's status: 404 if missing, 400 if the status is bad."""
     data = read_json_object()
-    if data is None:
-        return error_response("Request body must be a JSON object.", 400)
-
-    try:
-        order = order_tracker.update_order_status(
-            order_id, data.get("new_status")
-        )
-    except OrderNotFoundError as error:
-        return error_response(str(error), 404)
-    except ValueError as error:
-        return error_response(str(error), 400)
+    order = order_tracker.update_order_status(
+        order_id, data.get("new_status")
+    )
     return jsonify(order), 200
 
 
@@ -91,11 +97,7 @@ def list_orders_api():
     """List all orders, or only those matching ?status=<status>."""
     if "status" not in request.args:
         return jsonify(order_tracker.list_all_orders()), 200
-
-    try:
-        orders = order_tracker.list_orders_by_status(request.args["status"])
-    except ValueError as error:
-        return error_response(str(error), 400)
+    orders = order_tracker.list_orders_by_status(request.args["status"])
     return jsonify(orders), 200
 
 
