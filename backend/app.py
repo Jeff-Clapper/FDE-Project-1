@@ -92,6 +92,13 @@ def update_order_status_api(order_id):
     return jsonify(order), 200
 
 
+@app.route('/api/orders/<string:order_id>', methods=['DELETE'])
+def delete_order_api(order_id):
+    """Delete an order: 204 with no body, or 404 if it does not exist."""
+    order_tracker.delete_order(order_id)
+    return "", 204
+
+
 @app.route('/api/orders', methods=['GET'])
 def list_orders_api():
     """List orders, optionally filtered by ?customer_id= and/or ?status=."""

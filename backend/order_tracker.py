@@ -30,7 +30,9 @@ class OrderTracker:
     and retrieve order information.
     """
     def __init__(self, storage):
-        required_methods = ['save_order', 'get_order', 'get_all_orders']
+        required_methods = [
+            'save_order', 'get_order', 'get_all_orders', 'delete_order'
+        ]
         for method in required_methods:
             if not callable(getattr(storage, method, None)):
                 raise TypeError(
@@ -87,6 +89,15 @@ class OrderTracker:
         updated_order["status"] = new_status
         self.storage.save_order(order_id, updated_order)
         return updated_order
+
+    def delete_order(self, order_id: str):
+        """Remove an existing order, or raise OrderNotFoundError."""
+        _require_non_empty_string(order_id, "Order ID")
+        if not self.storage.get_order(order_id):
+            raise OrderNotFoundError(
+                f"Order with ID '{order_id}' does not exist."
+            )
+        self.storage.delete_order(order_id)
 
     def list_all_orders(self):
         """Return every stored order as a list."""
