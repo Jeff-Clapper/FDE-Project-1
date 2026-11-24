@@ -159,3 +159,73 @@ def test_get_order_rejects_invalid_id(order_tracker, mock_storage, bad_order_id)
         order_tracker.get_order_by_id(bad_order_id)
 
     mock_storage.get_order.assert_not_called()
+
+# --- update_order_status ---
+
+def test_update_order_status_saves_new_status(order_tracker, mock_storage):
+    """Tests that an existing order is saved with its new status."""
+    mock_storage.get_order.return_value = {
+        "order_id": "ORD001",
+        "item_name": "Laptop",
+        "quantity": 1,
+        "customer_id": "CUST001",
+        "status": "pending",
+    }
+
+    order_tracker.update_order_status("ORD001", "shipped")
+
+    mock_storage.get_order.assert_called_once_with("ORD001")
+    mock_storage.save_order.assert_called_once_with("ORD001", {
+        "order_id": "ORD001",
+        "item_name": "Laptop",
+        "quantity": 1,
+        "customer_id": "CUST001",
+        "status": "shipped",
+    })
+
+def test_update_order_status_returns_updated_order(order_tracker, mock_storage):
+    """Tests that the updated order is returned to the caller."""
+    mock_storage.get_order.return_value = {"order_id": "ORD001", "status": "pending"}
+
+    updated_order = order_tracker.update_order_status("ORD001", "shipped")
+
+    assert updated_order == {"order_id": "ORD001", "status": "shipped"}
+
+def test_update_order_status_does_not_mutate_stored_order(order_tracker, mock_storage):
+    """Tests that the dictionary returned by storage is copied, not changed in place."""
+    existing_order = {"order_id": "ORD001", "status": "pending"}
+    mock_storage.get_order.return_value = existing_order
+
+    order_tracker.update_order_status("ORD001", "shipped")
+
+    saved_order = mock_storage.save_order.call_args.args[1]
+    assert saved_order["status"] == "shipped"
+    assert saved_order is not existing_order
+    assert existing_order["status"] == "pending"
+
+@pytest.mark.parametrize("bad_status", ["flying", "", None])
+def test_update_order_status_rejects_invalid_status_before_storage(order_tracker, mock_storage, bad_status):
+    """Tests that an invalid status fails fast without reading or writing storage."""
+    with pytest.raises(ValueError, match="Invalid status"):
+        order_tracker.update_order_status("ORD001", bad_status)
+
+    mock_storage.get_order.assert_not_called()
+    mock_storage.save_order.assert_not_called()
+
+def test_update_order_status_raises_error_if_missing(order_tracker, mock_storage):
+    """Tests that updating a nonexistent order raises a ValueError."""
+    mock_storage.get_order.return_value = None
+
+    with pytest.raises(ValueError, match="Order with ID 'MISSING' does not exist."):
+        order_tracker.update_order_status("MISSING", "shipped")
+
+    mock_storage.save_order.assert_not_called()
+
+@pytest.mark.parametrize("bad_order_id", ["", "   ", None, 123])
+def test_update_order_status_rejects_invalid_id(order_tracker, mock_storage, bad_order_id):
+    """Tests that an empty or non-string ID is rejected without reading storage."""
+    with pytest.raises(ValueError, match="Order ID must be a non-empty string."):
+        order_tracker.update_order_status(bad_order_id, "shipped")
+
+    mock_storage.get_order.assert_not_called()
+    mock_storage.save_order.assert_not_called()
