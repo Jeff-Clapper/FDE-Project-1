@@ -94,10 +94,15 @@ def update_order_status_api(order_id):
 
 @app.route('/api/orders', methods=['GET'])
 def list_orders_api():
-    """List all orders, or only those matching ?status=<status>."""
-    if "status" not in request.args:
-        return jsonify(order_tracker.list_all_orders()), 200
-    orders = order_tracker.list_orders_by_status(request.args["status"])
+    """List orders, optionally filtered by ?customer_id= and/or ?status=."""
+    if "customer_id" in request.args:
+        orders = order_tracker.list_orders_by_customer(
+            request.args["customer_id"], request.args.get("status")
+        )
+    elif "status" in request.args:
+        orders = order_tracker.list_orders_by_status(request.args["status"])
+    else:
+        orders = order_tracker.list_all_orders()
     return jsonify(orders), 200
 
 

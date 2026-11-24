@@ -99,3 +99,15 @@ class OrderTracker:
             order for order in self.list_all_orders()
             if order["status"] == status
         ]
+
+    def list_orders_by_customer(self, customer_id: str, status: str = None):
+        """Return the customer's orders, optionally limited to one status."""
+        _require_non_empty_string(customer_id, "Customer ID")
+        if status is not None:
+            _require_valid_status(status)
+
+        return [
+            order for order in self.list_all_orders()
+            if order["customer_id"] == customer_id
+            and (status is None or order["status"] == status)
+        ]
