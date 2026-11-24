@@ -1,6 +1,6 @@
 import pytest
 from unittest.mock import Mock
-from ..order_tracker import OrderTracker
+from ..order_tracker import OrderTracker, OrderNotFoundError
 
 # --- Fixtures for Unit Tests ---
 
@@ -473,3 +473,40 @@ def test_list_orders_by_customer_rejects_invalid_status(
         order_tracker.list_orders_by_customer("CUST001", status=bad_status)
 
     mock_storage.get_all_orders.assert_not_called()
+
+# --- delete_order ---
+
+
+def test_delete_order_removes_existing_order(order_tracker, mock_storage):
+    """Tests that an existing order is looked up and deleted."""
+    mock_storage.get_order.return_value = {"order_id": "ORD001"}
+
+    order_tracker.delete_order("ORD001")
+
+    mock_storage.get_order.assert_called_once_with("ORD001")
+    mock_storage.delete_order.assert_called_once_with("ORD001")
+
+
+def test_delete_order_raises_error_if_missing(order_tracker, mock_storage):
+    """Tests that deleting a nonexistent order raises OrderNotFoundError."""
+    mock_storage.get_order.return_value = None
+
+    with pytest.raises(
+        OrderNotFoundError, match="Order with ID 'MISSING' does not exist."
+    ):
+        order_tracker.delete_order("MISSING")
+
+    mock_storage.delete_order.assert_not_called()
+
+
+@pytest.mark.parametrize("bad_order_id", ["", "   ", None, 123])
+def test_delete_order_rejects_invalid_id(
+        order_tracker, mock_storage, bad_order_id):
+    """Tests that an empty or non-string ID is rejected before storage."""
+    with pytest.raises(
+        ValueError, match="Order ID must be a non-empty string."
+    ):
+        order_tracker.delete_order(bad_order_id)
+
+    mock_storage.get_order.assert_not_called()
+    mock_storage.delete_order.assert_not_called()

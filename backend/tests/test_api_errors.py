@@ -183,3 +183,34 @@ def test_list_orders_api_invalid_customer_filter_returns_400(client, query):
     response = client.get(f'/api/orders{query}')
     assert response.status_code == 400
     assert "error" in response.json
+
+
+# --- DELETE /api/orders/<order_id> ---
+
+
+def test_delete_order_api_returns_204_and_removes_order(client):
+    client.post('/api/orders', json=VALID_ORDER)
+
+    response = client.delete('/api/orders/ERR001')
+
+    assert response.status_code == 204
+    assert response.data == b""
+    assert client.get('/api/orders/ERR001').status_code == 404
+
+
+def test_delete_order_api_missing_order_returns_404(client):
+    response = client.delete('/api/orders/NONEXISTENT')
+    assert response.status_code == 404
+    assert response.json == {
+        "error": "Order with ID 'NONEXISTENT' does not exist."
+    }
+
+
+def test_delete_order_api_leaves_other_orders(client):
+    client.post('/api/orders', json=VALID_ORDER)
+    client.post('/api/orders', json={**VALID_ORDER, "order_id": "ERR002"})
+
+    client.delete('/api/orders/ERR001')
+
+    response = client.get('/api/orders')
+    assert [order["order_id"] for order in response.json] == ["ERR002"]
