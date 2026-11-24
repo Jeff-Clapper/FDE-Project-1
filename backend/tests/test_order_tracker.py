@@ -254,3 +254,48 @@ def test_list_all_orders_returns_every_order(order_tracker, mock_storage):
     assert order_1 in orders
     assert order_2 in orders
     mock_storage.get_all_orders.assert_called_once_with()
+
+# --- list_orders_by_status ---
+
+@pytest.fixture
+def mixed_status_orders():
+    """Three stored orders: one pending and two shipped."""
+    return {
+        "ORD001": {"order_id": "ORD001", "item_name": "Laptop", "quantity": 1, "customer_id": "CUST001", "status": "pending"},
+        "ORD002": {"order_id": "ORD002", "item_name": "Mouse", "quantity": 2, "customer_id": "CUST002", "status": "shipped"},
+        "ORD003": {"order_id": "ORD003", "item_name": "Monitor", "quantity": 1, "customer_id": "CUST003", "status": "shipped"},
+    }
+
+def test_list_orders_by_status_returns_matching_orders(order_tracker, mock_storage, mixed_status_orders):
+    """Tests that only orders with the requested status are returned."""
+    mock_storage.get_all_orders.return_value = mixed_status_orders
+
+    orders = order_tracker.list_orders_by_status("shipped")
+
+    assert isinstance(orders, list)
+    assert sorted(order["order_id"] for order in orders) == ["ORD002", "ORD003"]
+
+def test_list_orders_by_status_returns_empty_list_when_no_match(order_tracker, mock_storage, mixed_status_orders):
+    """Tests that a valid status with no matching orders returns an empty list."""
+    mock_storage.get_all_orders.return_value = mixed_status_orders
+
+    orders = order_tracker.list_orders_by_status("delivered")
+
+    assert orders == []
+
+def test_list_orders_by_status_returns_empty_list_when_storage_empty(order_tracker, mock_storage):
+    """Tests that filtering an empty store returns an empty list."""
+    mock_storage.get_all_orders.return_value = {}
+
+    orders = order_tracker.list_orders_by_status("pending")
+
+    assert orders == []
+    mock_storage.get_all_orders.assert_called_once_with()
+
+@pytest.mark.parametrize("bad_status", ["", "flying", None])
+def test_list_orders_by_status_rejects_invalid_status(order_tracker, mock_storage, bad_status):
+    """Tests that an empty or invalid status is rejected without reading storage."""
+    with pytest.raises(ValueError, match="Invalid status"):
+        order_tracker.list_orders_by_status(bad_status)
+
+    mock_storage.get_all_orders.assert_not_called()
