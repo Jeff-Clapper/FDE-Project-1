@@ -124,3 +124,38 @@ def test_add_order_rejects_invalid_status(order_tracker, mock_storage, bad_statu
 
     mock_storage.get_order.assert_not_called()
     mock_storage.save_order.assert_not_called()
+
+# --- get_order_by_id ---
+
+def test_get_order_returns_existing_order(order_tracker, mock_storage):
+    """Tests that an existing order is returned from storage."""
+    existing_order = {
+        "order_id": "ORD001",
+        "item_name": "Laptop",
+        "quantity": 1,
+        "customer_id": "CUST001",
+        "status": "pending",
+    }
+    mock_storage.get_order.return_value = existing_order
+
+    order = order_tracker.get_order_by_id("ORD001")
+
+    assert order == existing_order
+    mock_storage.get_order.assert_called_once_with("ORD001")
+
+def test_get_order_returns_none_when_missing(order_tracker, mock_storage):
+    """Tests that None is returned when no order matches the ID."""
+    mock_storage.get_order.return_value = None
+
+    order = order_tracker.get_order_by_id("MISSING")
+
+    assert order is None
+    mock_storage.get_order.assert_called_once_with("MISSING")
+
+@pytest.mark.parametrize("bad_order_id", ["", "   ", None, 123])
+def test_get_order_rejects_invalid_id(order_tracker, mock_storage, bad_order_id):
+    """Tests that an empty or non-string ID is rejected without reading storage."""
+    with pytest.raises(ValueError, match="Order ID must be a non-empty string."):
+        order_tracker.get_order_by_id(bad_order_id)
+
+    mock_storage.get_order.assert_not_called()
