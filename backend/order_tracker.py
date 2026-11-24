@@ -4,6 +4,14 @@
 VALID_STATUSES = ("pending", "processing", "shipped", "delivered", "cancelled")
 
 
+class DuplicateOrderError(ValueError):
+    """Raised when an order ID is already in use."""
+
+
+class OrderNotFoundError(ValueError):
+    """Raised when an order ID does not match any stored order."""
+
+
 def _require_non_empty_string(value, field_label):
     if not isinstance(value, str) or not value.strip():
         raise ValueError(f"{field_label} must be a non-empty string.")
@@ -36,7 +44,7 @@ class OrderTracker:
         _require_valid_status(status)
 
         if self.storage.get_order(order_id):
-            raise ValueError(f"Order with ID '{order_id}' already exists.")
+            raise DuplicateOrderError(f"Order with ID '{order_id}' already exists.")
 
         order = {
             "order_id": order_id,
@@ -58,7 +66,7 @@ class OrderTracker:
 
         existing_order = self.storage.get_order(order_id)
         if not existing_order:
-            raise ValueError(f"Order with ID '{order_id}' does not exist.")
+            raise OrderNotFoundError(f"Order with ID '{order_id}' does not exist.")
 
         updated_order = existing_order.copy()
         updated_order["status"] = new_status

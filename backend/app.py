@@ -1,5 +1,5 @@
 from flask import Flask, request, jsonify, send_from_directory
-from backend.order_tracker import OrderTracker
+from backend.order_tracker import OrderTracker, DuplicateOrderError, OrderNotFoundError
 from backend.in_memory_storage import InMemoryStorage
 
 app = Flask(__name__, static_folder='../frontend')
@@ -14,21 +14,68 @@ def serve_index():
 def serve_static(filename):
     return send_from_directory(app.static_folder, filename)
 
+def error_response(message, status_code):
+    return jsonify({"error": message}), status_code
+
+def read_json_object():
+    data = request.get_json(silent=True)
+    return data if isinstance(data, dict) else None
+
 @app.route('/api/orders', methods=['POST'])
 def add_order_api():
-    pass
+    data = read_json_object()
+    if data is None:
+        return error_response("Request body must be a JSON object.", 400)
+
+    try:
+        order = order_tracker.add_order(
+            data.get("order_id"),
+            data.get("item_name"),
+            data.get("quantity"),
+            data.get("customer_id"),
+            data.get("status", "pending"),
+        )
+    except DuplicateOrderError as error:
+        return error_response(str(error), 409)
+    except ValueError as error:
+        return error_response(str(error), 400)
+    return jsonify(order), 201
 
 @app.route('/api/orders/<string:order_id>', methods=['GET'])
 def get_order_api(order_id):
-    pass
+    try:
+        order = order_tracker.get_order_by_id(order_id)
+    except ValueError as error:
+        return error_response(str(error), 400)
+    if order is None:
+        return error_response("Order not found", 404)
+    return jsonify(order), 200
 
+@app.route('/api/orders/<string:order_id>', methods=['PUT'])
 @app.route('/api/orders/<string:order_id>/status', methods=['PUT'])
 def update_order_status_api(order_id):
-    pass
+    data = read_json_object()
+    if data is None:
+        return error_response("Request body must be a JSON object.", 400)
+
+    try:
+        order = order_tracker.update_order_status(order_id, data.get("new_status"))
+    except OrderNotFoundError as error:
+        return error_response(str(error), 404)
+    except ValueError as error:
+        return error_response(str(error), 400)
+    return jsonify(order), 200
 
 @app.route('/api/orders', methods=['GET'])
 def list_orders_api():
-    pass
+    if "status" not in request.args:
+        return jsonify(order_tracker.list_all_orders()), 200
+
+    try:
+        orders = order_tracker.list_orders_by_status(request.args["status"])
+    except ValueError as error:
+        return error_response(str(error), 400)
+    return jsonify(orders), 200
 
 if __name__ == '__main__':
     app.run(host="0.0.0.0", debug=True)
