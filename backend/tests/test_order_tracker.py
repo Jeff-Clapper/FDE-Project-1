@@ -229,3 +229,28 @@ def test_update_order_status_rejects_invalid_id(order_tracker, mock_storage, bad
 
     mock_storage.get_order.assert_not_called()
     mock_storage.save_order.assert_not_called()
+
+# --- list_all_orders ---
+
+def test_list_all_orders_returns_empty_list_when_no_orders(order_tracker, mock_storage):
+    """Tests that an empty list is returned when storage has no orders."""
+    mock_storage.get_all_orders.return_value = {}
+
+    orders = order_tracker.list_all_orders()
+
+    assert orders == []
+    mock_storage.get_all_orders.assert_called_once_with()
+
+def test_list_all_orders_returns_every_order(order_tracker, mock_storage):
+    """Tests that every stored order is returned as a list of dictionaries."""
+    order_1 = {"order_id": "ORD001", "item_name": "Laptop", "quantity": 1, "customer_id": "CUST001", "status": "pending"}
+    order_2 = {"order_id": "ORD002", "item_name": "Mouse", "quantity": 2, "customer_id": "CUST002", "status": "shipped"}
+    mock_storage.get_all_orders.return_value = {"ORD001": order_1, "ORD002": order_2}
+
+    orders = order_tracker.list_all_orders()
+
+    assert isinstance(orders, list)
+    assert len(orders) == 2
+    assert order_1 in orders
+    assert order_2 in orders
+    mock_storage.get_all_orders.assert_called_once_with()
