@@ -140,3 +140,46 @@ def test_list_orders_api_invalid_status_filter_returns_400(client, query):
     response = client.get(f'/api/orders{query}')
     assert response.status_code == 400
     assert "error" in response.json
+
+
+# --- GET /api/orders?customer_id=<id>[&status=<status>] ---
+
+
+@pytest.fixture
+def customer_orders(client):
+    """Create two orders for C1 (pending, shipped) and one for C2."""
+    client.post('/api/orders', json={**VALID_ORDER, "order_id": "CUS001"})
+    client.post('/api/orders', json={
+        **VALID_ORDER, "order_id": "CUS002", "status": "shipped"
+    })
+    client.post('/api/orders', json={
+        **VALID_ORDER, "order_id": "CUS003", "customer_id": "C2"
+    })
+
+
+def test_list_orders_api_filters_by_customer(client, customer_orders):
+    response = client.get('/api/orders?customer_id=C1')
+    assert response.status_code == 200
+    order_ids = sorted(order["order_id"] for order in response.json)
+    assert order_ids == ["CUS001", "CUS002"]
+
+
+def test_list_orders_api_filters_by_customer_and_status(
+        client, customer_orders):
+    response = client.get('/api/orders?customer_id=C1&status=pending')
+    assert response.status_code == 200
+    assert [order["order_id"] for order in response.json] == ["CUS001"]
+
+
+def test_list_orders_api_customer_with_no_orders_returns_empty_list(
+        client, customer_orders):
+    response = client.get('/api/orders?customer_id=C9')
+    assert response.status_code == 200
+    assert response.json == []
+
+
+@pytest.mark.parametrize("query", ['?customer_id=', '?customer_id=%20%20'])
+def test_list_orders_api_invalid_customer_filter_returns_400(client, query):
+    response = client.get(f'/api/orders{query}')
+    assert response.status_code == 400
+    assert "error" in response.json

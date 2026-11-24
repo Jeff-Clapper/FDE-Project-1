@@ -385,3 +385,91 @@ def test_list_orders_by_status_rejects_invalid_status(
         order_tracker.list_orders_by_status(bad_status)
 
     mock_storage.get_all_orders.assert_not_called()
+
+# --- list_orders_by_customer ---
+
+
+@pytest.fixture
+def mixed_customer_orders():
+    """Three stored orders: two for CUST001 and one for CUST002."""
+    return {
+        "ORD001": {
+            "order_id": "ORD001", "item_name": "Laptop", "quantity": 1,
+            "customer_id": "CUST001", "status": "pending",
+        },
+        "ORD002": {
+            "order_id": "ORD002", "item_name": "Mouse", "quantity": 2,
+            "customer_id": "CUST001", "status": "shipped",
+        },
+        "ORD003": {
+            "order_id": "ORD003", "item_name": "Monitor", "quantity": 1,
+            "customer_id": "CUST002", "status": "pending",
+        },
+    }
+
+
+def test_list_orders_by_customer_returns_only_that_customers_orders(
+        order_tracker, mock_storage, mixed_customer_orders):
+    """Tests that only orders for the requested customer are returned."""
+    mock_storage.get_all_orders.return_value = mixed_customer_orders
+
+    orders = order_tracker.list_orders_by_customer("CUST001")
+
+    assert isinstance(orders, list)
+    order_ids = sorted(order["order_id"] for order in orders)
+    assert order_ids == ["ORD001", "ORD002"]
+
+
+def test_list_orders_by_customer_with_status_applies_both_filters(
+        order_tracker, mock_storage, mixed_customer_orders):
+    """Tests that customer and status filters can be combined."""
+    mock_storage.get_all_orders.return_value = mixed_customer_orders
+
+    orders = order_tracker.list_orders_by_customer(
+        "CUST001", status="pending"
+    )
+
+    assert [order["order_id"] for order in orders] == ["ORD001"]
+
+
+def test_list_orders_by_customer_returns_empty_list_when_no_match(
+        order_tracker, mock_storage, mixed_customer_orders):
+    """Tests that a customer with no orders gets an empty list."""
+    mock_storage.get_all_orders.return_value = mixed_customer_orders
+
+    orders = order_tracker.list_orders_by_customer("CUST999")
+
+    assert orders == []
+
+
+def test_list_orders_by_customer_returns_empty_list_when_storage_empty(
+        order_tracker, mock_storage):
+    """Tests that filtering an empty store returns an empty list."""
+    mock_storage.get_all_orders.return_value = {}
+
+    orders = order_tracker.list_orders_by_customer("CUST001")
+
+    assert orders == []
+    mock_storage.get_all_orders.assert_called_once_with()
+
+
+@pytest.mark.parametrize("bad_customer_id", ["", "   ", None, 7])
+def test_list_orders_by_customer_rejects_invalid_customer_id(
+        order_tracker, mock_storage, bad_customer_id):
+    """Tests that an empty or non-string customer ID is rejected."""
+    with pytest.raises(
+        ValueError, match="Customer ID must be a non-empty string."
+    ):
+        order_tracker.list_orders_by_customer(bad_customer_id)
+
+    mock_storage.get_all_orders.assert_not_called()
+
+
+@pytest.mark.parametrize("bad_status", ["flying", ""])
+def test_list_orders_by_customer_rejects_invalid_status(
+        order_tracker, mock_storage, bad_status):
+    """Tests that an invalid status is rejected before storage is read."""
+    with pytest.raises(ValueError, match="Invalid status"):
+        order_tracker.list_orders_by_customer("CUST001", status=bad_status)
+
+    mock_storage.get_all_orders.assert_not_called()
