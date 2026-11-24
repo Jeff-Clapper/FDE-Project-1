@@ -49,7 +49,8 @@ class OrderTracker:
         return order
 
     def get_order_by_id(self, order_id: str):
-        pass
+        _require_non_empty_string(order_id, "Order ID")
+        return self.storage.get_order(order_id)
 
     def update_order_status(self, order_id: str, new_status: str):
         pass
