@@ -53,7 +53,17 @@ class OrderTracker:
         return self.storage.get_order(order_id)
 
     def update_order_status(self, order_id: str, new_status: str):
-        pass
+        _require_valid_status(new_status)
+        _require_non_empty_string(order_id, "Order ID")
+
+        existing_order = self.storage.get_order(order_id)
+        if not existing_order:
+            raise ValueError(f"Order with ID '{order_id}' does not exist.")
+
+        updated_order = existing_order.copy()
+        updated_order["status"] = new_status
+        self.storage.save_order(order_id, updated_order)
+        return updated_order
 
     def list_all_orders(self):
         pass
